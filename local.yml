@@ -1,0 +1,86 @@
+version: '3'
+
+volumes:
+  bmovez_local_postgres_data: {}
+  bmovez_local_postgres_data_backups: {}
+
+services:
+  django: &django
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+    image: bmovez_local_django
+    container_name: bmovez_local_django
+    depends_on:
+      - postgres
+      - redis
+    links:
+      - "centrifugo:centrifugo"
+    volumes:
+      - .:/app:z
+    env_file:
+      - ./.envs/.local/.django
+      - ./.envs/.local/.postgres
+      - ./.envs/.local/.centrifugo
+    ports:
+      - "8000:8000"
+    command: /start
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./compose/production/postgres/Dockerfile
+    image: bmovez_production_postgres
+    container_name: bmovez_local_postgres
+    volumes:
+      - bmovez_local_postgres_data:/var/lib/postgresql/data
+      - bmovez_local_postgres_data_backups:/backups
+    env_file:
+      - ./.envs/.local/.postgres
+
+  redis:
+    image: redis:6
+    container_name: bmovez_local_redis
+
+  centrifugo:
+    image: centrifugo/centrifugo:v4
+    container_name: bmovez_local_centrifugo
+    depends_on:
+      - redis
+    command: centrifugo
+    ports:
+      - 8888:8888
+    env_file:
+      - ./.envs/.local/.centrifugo
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  celeryworker:
+    <<: *django
+    image: bmovez_local_celeryworker
+    container_name: bmovez_local_celeryworker
+    depends_on:
+      - redis
+      - postgres
+    ports: []
+    command: /start-celeryworker
+
+  # celerybeat:
+  #   <<: *django
+  #   image: bmovez_local_celerybeat
+  #   container_name: bmovez_local_celerybeat
+  #   depends_on:
+  #     - redis
+  #     - postgres
+  #   ports: []
+  #   command: /start-celerybeat
+
+  # flower:
+  #   <<: *django
+  #   image: bmovez_local_flower
+  #   container_name: bmovez_local_flower
+  #   ports:
+  #     - "5555:5555"
+  #   command: /start-flower

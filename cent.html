@@ -1,0 +1,40 @@
+<html>
+
+<head>
+  <title>Centrifugo quick start</title>
+</head>
+
+<body>
+  <div id="counter">-</div>
+  <script src="https://unpkg.com/centrifuge@3.1.0/dist/centrifuge.js"></script>
+  <script type="text/javascript">
+    const container = document.getElementById('counter');
+
+    const centrifuge = new Centrifuge("wss:bmoves-staging.click:8000/connection/websocket", {
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYzVlNmJmZi04MGRkLTRjYTYtYTY0NC0wNGQ1NDU2MzlhNGQiLCJpbmZvIjp7ImVtYWlsIjoiYWRlYm93YWxlX2pvam9AeWFob28uY29tIn19.ki2EUSD7yTmwBZ7MyrGR5WcD5DcrngpEHZvNuMrvNqk"
+    });
+
+    centrifuge.on('connecting', function (ctx) {
+      console.log(`connecting: ${ctx.code}, ${ctx.reason}`);
+    }).on('connected', function (ctx) {
+      console.log(`connected over ${ctx.transport}`);
+    }).on('disconnected', function (ctx) {
+      console.log(`disconnected: ${ctx.code}, ${ctx.reason}`);
+    }).connect();
+
+    const sub = centrifuge.newSubscription("02fa8dd1-ad89-4387-bc55-0af6d874f9b1");
+
+    sub.on('publication', function (ctx) {
+      container.innerHTML = JSON.stringify(ctx.data);
+      document.title = ctx.data.value;
+    }).on('subscribing', function (ctx) {
+      console.log(`subscribing: ${ctx.code}, ${ctx.reason}`);
+    }).on('subscribed', function (ctx) {
+      console.log('subscribed', ctx);
+    }).on('unsubscribed', function (ctx) {
+      console.log(`unsubscribed: ${ctx.code}, ${ctx.reason}`);
+    }).subscribe();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,91 @@
+version: '3'
+
+volumes:
+  production_postgres_data: {}
+  production_postgres_data_backups: {}
+  production_traefik: {}
+
+services:
+  django: &django
+    build:
+      context: .
+      dockerfile: ./compose/production/django/Dockerfile
+
+    image: bmovez_production_django
+    links:
+      - "centrifugo:centrifugo"
+    depends_on:
+      - redis
+    env_file:
+      - ./.envs/.production/.django
+      - ./.envs/.production/.postgres
+      - ./.envs/.production/.centrifugo
+    command: /start
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./compose/production/postgres/Dockerfile
+    image: bmovez_production_postgres
+    volumes:
+      - production_postgres_data:/var/lib/postgresql/data
+      - production_postgres_data_backups:/backups
+    env_file:
+      - ./.envs/.production/.postgres
+
+  traefik:
+    build:
+      context: .
+      dockerfile: ./compose/production/traefik/Dockerfile
+    image: bmovez_production_traefik
+    depends_on:
+      - django
+    volumes:
+      - production_traefik:/etc/traefik/acme
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:5555:5555"
+      - "0.0.0.0:8000:8000"
+
+  redis:
+    image: redis:6
+
+  centrifugo:
+    image: centrifugo/centrifugo:v4
+    container_name: bmovez_production_centrifugo
+    depends_on:
+      - redis
+    command: centrifugo
+    env_file:
+      - ./.envs/.production/.centrifugo
+    ports:
+      - 8888
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  celeryworker:
+    <<: *django
+    image: bmovez_production_celeryworker
+    command: /start-celeryworker
+
+  celerybeat:
+    <<: *django
+    image: bmovez_production_celerybeat
+    command: /start-celerybeat
+
+  flower:
+    <<: *django
+    image: bmovez_production_flower
+    command: /start-flower
+
+  awscli:
+    build:
+      context: .
+      dockerfile: ./compose/production/aws/Dockerfile
+    env_file:
+      - ./.envs/.production/.django
+    volumes:
+      - production_postgres_data_backups:/backups:z
